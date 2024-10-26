@@ -11,7 +11,7 @@ Luego de las configuraciones en la maquina virtual para adecuar Hadoop y Spark, 
 hdfs dfs -mkdir /Tarea3
 
 #!/bin/bash
-wget https://raw.githubusercontent.com/johntibagan/unad-big-data/refs/heads/main/time_wasters_on_social_media.csv
+wget https://raw.githubusercontent.com/johntibagan/unad-big-data/refs/heads/main/JohnTibagan/time_wasters_on_social_media.csv
 pwd
 
 # mover archivo a Tarea3
