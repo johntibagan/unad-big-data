@@ -38,33 +38,36 @@ df = df.withColumn("Total Time Spent", F.col("Total Time Spent").cast("double"))
 df = df.withColumn("ProductivityLoss", F.col("ProductivityLoss").cast("double"))
 
 # 3. Análisis Exploratorio de Datos (EDA)
-# - Distribución de la edad por plataforma
-print("\nDistribución de la edad promedio por plataforma:")
-age_distribution = df.groupBy("Platform").agg(F.avg("Age").alias("Average Age"))
-age_distribution.show()
 
-# - Usuarios con alto nivel de adicción y satisfacción
-print("\nUsuarios con alto nivel de adicción y satisfacción (ambos mayor a 4):")
-high_addiction_satisfaction = df.filter((F.col("Addiction Level") > 4) & (F.col("Satisfaction") > 4))
-high_addiction_satisfaction.select("UserID", "Addiction Level", "Satisfaction").show()
+# - Conteo de usuarios por plataforma ordenado de mayor a menor
+print("\nConteo de usuarios por plataforma:")
+user_count_by_platform = df.groupBy("Platform").agg(F.count("UserID").alias("User Count")) \
+    .orderBy(F.desc("User Count"))
+user_count_by_platform.show()
 
-# - Ingreso promedio y deuda promedio por ocupación
-print("\nIngreso promedio y deuda promedio por ocupación:")
-income_debt_by_profession = df.groupBy("Profession").agg(
-    F.avg("Income").alias("Avg Income"),
-    F.avg("Debt").alias("Avg Debt")
-)
-income_debt_by_profession.show()
+# - Conteo de usuarios por ubicación geográfica ordenado de mayor a menor
+print("\nConteo de usuarios por ubicación geográfica:")
+user_count_by_location = df.groupBy("Location").agg(F.count("UserID").alias("User Count")) \
+    .orderBy(F.desc("User Count"))
+user_count_by_location.show()
 
-# Usuarios menores de 28 años con algunas columnas seleccionadas
-print("\nUsuarios menores de 28 años:")
-ages = df.filter(F.col("Age") < 28).select('UserID', 'Age', 'Platform', 'Total Time Spent')
-ages.show()
+# - Segmento de usuarios que más usan alguna plataforma
+print("\nSegmento de usuarios que más usan alguna plataforma:")
+most_active_users = df.groupBy("Platform").agg(F.count("UserID").alias("User Count")) \
+    .orderBy(F.desc("User Count")).limit(1)
+most_active_users.show()
 
-# Usuarios ordenados por edad en orden descendente
-print("\nUsuarios ordenados por edad descendente:")
-sorted_df = df.orderBy(F.col("Age").desc())
-sorted_df.show()
+# - Impacto en la productividad (promedio de Pérdida de Productividad por plataforma)
+print("\nImpacto en la productividad (promedio de Pérdida de Productividad por plataforma):")
+productivity_impact = df.groupBy("Platform").agg(F.avg("ProductivityLoss").alias("Average Productivity Loss")) \
+    .orderBy(F.desc("Average Productivity Loss"))
+productivity_impact.show()
+
+# - Tiempo de uso promedio gastado por los usuarios por plataforma
+print("\nTiempo de uso promedio gastado por los usuarios por plataforma:")
+average_time_spent = df.groupBy("Platform").agg(F.avg("Total Time Spent").alias("Average Time Spent")) \
+    .orderBy(F.desc("Average Time Spent"))
+average_time_spent.show()
 
 # 4. Almacenamiento de resultados procesados
 print("\nGuardando resultados procesados en formato Parquet...")
