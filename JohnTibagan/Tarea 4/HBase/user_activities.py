@@ -1,37 +1,32 @@
 import happybase
 import pandas as pd
 
-# Bloque principal de ejecución
 try:
-    # 1. Establecer conexión con HBase
+    # 1. Conectar a HBase
     connection = happybase.Connection('localhost')
     print("Conexión establecida con HBase")
     
-    # 2. Crear la tabla con las familias de columnas
+    # 2. Crear la tabla con familias de columnas
     table_name = 'user_activities'
     families = {
-        'activity': dict(),  # Información principal de la actividad
-        'details': dict()    # Detalles específicos de cada actividad
+        'activity': dict(),  # Datos principales
+        'details': dict()    # Detalles específicos
     }
     
-    # Eliminar la tabla si ya existe
     if table_name.encode() in connection.tables():
         print(f"Eliminando tabla existente - {table_name}")
         connection.delete_table(table_name, disable=True)
     
-    # Crear nueva tabla
     connection.create_table(table_name, families)
     table = connection.table(table_name)
-    print("Tabla 'user_activities' creada exitosamente")
-    
-    # 3. Cargar datos desde el archivo CSV
+    print(f"Tabla '{table_name}' creada exitosamente")
+
+    # 3. Cargar datos desde un CSV
     csv_file_path = 'social_activities.csv'
     activity_data = pd.read_csv(csv_file_path)
     
     for _, row in activity_data.iterrows():
-        row_key = row['activity_id'].encode()  # Usar activity_id como row key
-        
-        # Organizar los datos en familias de columnas
+        row_key = row['activity_id'].encode()
         data = {
             b'activity:user_id': str(row['user_id']).encode(),
             b'activity:platform': str(row['platform']).encode(),
@@ -45,51 +40,73 @@ try:
             b'details:content': str(row['details_content']).encode(),
             b'details:reaction_type': str(row['details_reaction_type']).encode()
         }
-        
         table.put(row_key, data)
     
     print("Datos cargados exitosamente")
 
-    # 4. Consultas sobre los datos
-    print("\n=== Consulta: Primeras 3 actividades cargadas ===")
+    # 4. Consultas
+    print("\n=== Primeras 3 actividades cargadas ===")
     count = 0
-    for key, data in table.scan():
-        if count < 3:
-            print(f"\nActividad ID: {key.decode()}")
-            print(f"Usuario: {data[b'activity:user_id'].decode()}")
-            print(f"Tipo de actividad: {data[b'activity:type'].decode()}")
-            print(f"Detalles del contenido: {data.get(b'details:content', b'').decode()}")
-            count += 1
+    for key, data in table.scan(limit=3):
+        print(f"Actividad ID: {key.decode()}, Tipo: {data[b'activity:type'].decode()}")
+        count += 1
     
-    # Filtrar actividades tipo "search"
-    print("\n=== Consulta: Filtrar actividades tipo 'search' ===")
+    # Filtrar actividades de tipo 'search'
+    print("\n=== Consultas: Filtrar actividades tipo 'search' ===")
     for key, data in table.scan(filter=b"SingleColumnValueFilter('activity', 'type', =, 'binary:search')"):
-        print(f"Actividad ID: {key.decode()}, Término de búsqueda: {data[b'activity:search_term'].decode()}")
+        print(f"Actividad ID: {key.decode()}, Término buscado: {data[b'activity:search_term'].decode()}")
+    
+    # Filtrar actividades realizadas en 'YouTube'
+    print("\n=== Consultas: Filtrar actividades en 'YouTube' ===")
+    for key, data in table.scan(filter=b"SingleColumnValueFilter('activity', 'platform', =, 'binary:YouTube')"):
+        print(f"Actividad ID: {key.decode()}, Usuario: {data[b'activity:user_id'].decode()}")
 
-    # 5. Operaciones de escritura: Inserción
+    # Filtrar actividades con duración mayor a 300 segundos
+    print("\n=== Consultas: Filtrar videos vistos más de 300 segundos ===")
+    for key, data in table.scan():
+        if int(data.get(b'activity:duration_seconds', b'0').decode()) > 300:
+            print(f"Actividad ID: {key.decode()}, Duración: {data[b'activity:duration_seconds'].decode()} segundos")
+
+    # 5. Inserción
     print("\n=== Inserción de nueva actividad ===")
     new_activity = {
         b'activity:user_id': b'new_user_01',
         b'activity:platform': b'Instagram',
         b'activity:type': b'like',
         b'activity:date': b'2024-11-12T12:00:00',
-        b'activity:duration_seconds': b'0',
-        b'activity:search_term': b'',
         b'details:post_id': b'P100',
         b'details:reaction_type': b'like'
     }
     table.put(b'activity_101', new_activity)
-    print("Nueva actividad insertada con éxito")
+    print("Nueva actividad insertada: activity_101")
 
-    # 6. Actualización de un registro existente
-    print("\n=== Actualización de una actividad existente ===")
-    table.put(b'activity_101', {b'details:reaction_type': b'love'})
-    print("Actividad actualizada con éxito")
+    # Consulta previa a la eliminación
+    print("\n=== Consulta previa a eliminación ===")
+    row = table.row(b'activity_101')
+    print(f"Datos antes de eliminar: {row}")
 
-    # 7. Eliminación de un registro
-    print("\n=== Eliminación de una actividad ===")
+    # 6. Eliminación
+    print("\n=== Eliminación de la actividad ===")
     table.delete(b'activity_101')
-    print("Actividad eliminada con éxito")
+    print("Actividad eliminada: activity_101")
+
+    # Consulta posterior a la eliminación
+    print("\n=== Consulta posterior a eliminación ===")
+    row = table.row(b'activity_101')
+    if not row:
+        print("La actividad no existe, confirmación de eliminación.")
+    else:
+        print(f"Datos encontrados: {row}")
+
+    # 7. Actualización
+    print("\n=== Actualización de una actividad existente ===")
+    table.put(b'activity_002', {b'details:reaction_type': b'love'})
+    print("Actividad actualizada: activity_002")
+
+    # Consulta para verificar actualización
+    print("\n=== Verificar actualización ===")
+    updated_row = table.row(b'activity_002')
+    print(f"Detalles después de actualización: {updated_row.get(b'details:reaction_type', b'').decode()}")
 
 except Exception as e:
     print(f"Error: {e}")
