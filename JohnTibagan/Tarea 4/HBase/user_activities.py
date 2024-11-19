@@ -11,7 +11,7 @@ try:
     table_name = 'user_activities'
     families = {
         'activity': dict(),  # Información principal de la actividad
-        'details': dict()    # Detalles específicos de la actividad
+        'details': dict()    # Detalles específicos de cada actividad
     }
     
     # Eliminar la tabla si ya existe
@@ -24,20 +24,28 @@ try:
     table = connection.table(table_name)
     print("Tabla 'user_activities' creada exitosamente")
     
-    # 3. Cargar datos desde el archivo JSON generado
-    activity_data = pd.read_json('social_activities.json', lines=True)
+    # 3. Cargar datos desde el archivo CSV
+    csv_file_path = 'social_activities.csv'
+    activity_data = pd.read_csv(csv_file_path)
     
-    for index, row in activity_data.iterrows():
+    for _, row in activity_data.iterrows():
         row_key = row['activity_id'].encode()  # Usar activity_id como row key
+        
+        # Organizar los datos en familias de columnas
         data = {
             b'activity:user_id': str(row['user_id']).encode(),
             b'activity:platform': str(row['platform']).encode(),
             b'activity:type': str(row['type']).encode(),
             b'activity:date': str(row['date']).encode(),
-            b'details:details': str(row['details']).encode(),
-            b'details:duration_seconds': str(row['duration_seconds']).encode(),
-            b'details:search_term': str(row['search_term']).encode()
+            b'activity:duration_seconds': str(row['duration_seconds']).encode(),
+            b'activity:search_term': str(row['search_term']).encode(),
+            b'details:video_id': str(row['details_video_id']).encode(),
+            b'details:title': str(row['details_title']).encode(),
+            b'details:post_id': str(row['details_post_id']).encode(),
+            b'details:content': str(row['details_content']).encode(),
+            b'details:reaction_type': str(row['details_reaction_type']).encode()
         }
+        
         table.put(row_key, data)
     
     print("Datos cargados exitosamente")
@@ -50,13 +58,14 @@ try:
             print(f"\nActividad ID: {key.decode()}")
             print(f"Usuario: {data[b'activity:user_id'].decode()}")
             print(f"Tipo de actividad: {data[b'activity:type'].decode()}")
+            print(f"Detalles del contenido: {data.get(b'details:content', b'').decode()}")
             count += 1
     
-    # Filtrar actividades por tipo específico (ej: "comment")
-    print("\n=== Consulta: Filtrar actividades tipo 'comment' ===")
-    for key, data in table.scan(filter=b"SingleColumnValueFilter('activity', 'type', =, 'binary:comment')"):
-        print(f"Actividad ID: {key.decode()}, Tipo: {data[b'activity:type'].decode()}")
-    
+    # Filtrar actividades tipo "search"
+    print("\n=== Consulta: Filtrar actividades tipo 'search' ===")
+    for key, data in table.scan(filter=b"SingleColumnValueFilter('activity', 'type', =, 'binary:search')"):
+        print(f"Actividad ID: {key.decode()}, Término de búsqueda: {data[b'activity:search_term'].decode()}")
+
     # 5. Operaciones de escritura: Inserción
     print("\n=== Inserción de nueva actividad ===")
     new_activity = {
@@ -64,16 +73,17 @@ try:
         b'activity:platform': b'Instagram',
         b'activity:type': b'like',
         b'activity:date': b'2024-11-12T12:00:00',
-        b'details:details': b'Liked a photo',
-        b'details:duration_seconds': b'0',
-        b'details:search_term': b''
+        b'activity:duration_seconds': b'0',
+        b'activity:search_term': b'',
+        b'details:post_id': b'P100',
+        b'details:reaction_type': b'like'
     }
     table.put(b'activity_101', new_activity)
     print("Nueva actividad insertada con éxito")
 
     # 6. Actualización de un registro existente
     print("\n=== Actualización de una actividad existente ===")
-    table.put(b'activity_101', {b'details:details': b'Liked a video'})
+    table.put(b'activity_101', {b'details:reaction_type': b'love'})
     print("Actividad actualizada con éxito")
 
     # 7. Eliminación de un registro
